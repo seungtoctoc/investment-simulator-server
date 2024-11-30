@@ -17,4 +17,5 @@ public class Assets {
     private String type;
     private String exchange;
     private String name;
+    private String koreanName;
 }
