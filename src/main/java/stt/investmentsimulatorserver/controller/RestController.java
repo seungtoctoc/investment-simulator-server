@@ -1,21 +1,33 @@
 package stt.investmentsimulatorserver.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import lombok.AllArgsConstructor;
+import stt.investmentsimulatorserver.domain.Assets;
+import stt.investmentsimulatorserver.service.Service;
 import stt.investmentsimulatorserver.utils.ApiUtils;
 
 @org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api")
+@AllArgsConstructor
 public class RestController {
-    @GetMapping("/test")
-    public ApiUtils.ApiResult<Object> test() {
-        return ApiUtils.success("success");
-    }
+    private Service service;
 
-    @GetMapping("/test2")
-    public String test2() {
-        return "success";
+    @GetMapping("/find")
+    public ApiUtils.ApiResult<Object> findAssets(@RequestParam String keyword) {
+        List<Assets> foundAssets = service.findAssets(keyword);
+
+        if (foundAssets == null) {
+            return ApiUtils.error(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        if (foundAssets.isEmpty()) {
+            return ApiUtils.error(HttpStatus.NOT_FOUND);
+        }
+        return ApiUtils.success(foundAssets);
     }
 }
