@@ -9,9 +9,9 @@ import stt.investmentsimulatorserver.domain.Assets;
 
 @Repository
 public interface AssetsRepository extends JpaRepository<Assets, Integer> {
-    List<Assets> findAllBySymbolStartingWithIgnoreCase(String keyword);
+    List<Assets> findAllByKoreanNameContaining(String koreanName);
 
-    List<Assets> findAllByNameContainingIgnoreCase(String keyword);
+    List<Assets> findAllByNameContainingIgnoreCase(String symbol);
 
-    List<Assets> findAllByKoreanNameContainingIgnoreCase(String keyword);
+    List<Assets> findAllBySymbolStartingWithIgnoreCase(String symbol);
 }

@@ -19,8 +19,8 @@ public class RestController {
     private Service service;
 
     @GetMapping("/find")
-    public ApiUtils.ApiResult<Object> findAssets(@RequestParam String keyword) {
-        List<Assets> foundAssets = service.findAssets(keyword);
+    public ApiUtils.ApiResult<Object> findAssets(@RequestParam String keyword, Integer limit) {
+        List<Assets> foundAssets = service.findAssets(keyword, limit);
 
         if (foundAssets == null) {
             return ApiUtils.error(HttpStatus.INTERNAL_SERVER_ERROR);

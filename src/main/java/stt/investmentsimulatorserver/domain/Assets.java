@@ -18,4 +18,5 @@ public class Assets {
     private String exchange;
     private String name;
     private String koreanName;
+    private Long marketCap;
 }

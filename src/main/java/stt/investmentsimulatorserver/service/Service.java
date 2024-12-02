@@ -1,7 +1,9 @@
 package stt.investmentsimulatorserver.service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 import stt.investmentsimulatorserver.domain.Assets;
@@ -13,22 +15,41 @@ import stt.investmentsimulatorserver.utils.Utils;
 public class Service {
     private AssetsRepository assetsRepository;
 
-    public List<Assets> findAssets(String keyword) {
-        List<Assets> foundAssets = assetsRepository.findAllBySymbolStartingWithIgnoreCase(keyword);
-        foundAssets.sort(Comparator.comparing(Assets::getSymbol));
-
-        if (foundAssets.size() > 20) {
-            return foundAssets;
+    public List<Assets> findAssets(String keyword, int limit) {
+        if (Utils.containsKorean(keyword)) {
+            List<Assets> assetsFoundByKoreanName = assetsRepository.findAllByKoreanNameContaining(keyword);
+            assetsFoundByKoreanName = sortAssetsByMarketCap(assetsFoundByKoreanName);
+            return Utils.limitList(assetsFoundByKoreanName, limit);
         }
 
-        if (Utils.isEnglishOnly(keyword)) {
-            List<Assets> foundAssetsByName = assetsRepository.findAllByNameContainingIgnoreCase(keyword);
-            foundAssetsByName.sort(Comparator.comparing(Assets::getSymbol));
-            return foundAssetsByName;
+        List<Assets> assetsFoundByName = assetsRepository.findAllByNameContainingIgnoreCase(keyword);
+        assetsFoundByName = sortAssetsByMarketCap(assetsFoundByName);
+
+        if (Utils.containsEnglishAndNumber(keyword)) {
+            return Utils.limitList(assetsFoundByName, limit);
         }
 
-        List<Assets> foundAssetsByKoreanName = assetsRepository.findAllByKoreanNameContainingIgnoreCase(keyword);
-        foundAssetsByKoreanName.sort(Comparator.comparing(Assets::getSymbol));
-        return foundAssetsByKoreanName;
+        List<Assets> assetsFoundBySymbol = assetsRepository.findAllBySymbolStartingWithIgnoreCase(keyword);
+        assetsFoundBySymbol = sortAssetsByMarketCap(assetsFoundBySymbol);
+
+        List<Assets> result = new ArrayList<>();
+        result.addAll(Utils.limitList(assetsFoundBySymbol, limit / 2));
+        result.addAll(Utils.limitList(assetsFoundByName, limit - result.size()));
+
+        return result;
     }
+
+    List<Assets> sortAssetsByMarketCap(List<Assets> assets) {
+        int krwUsd = 1400;
+
+        return assets.stream().sorted((asset1, asset2) -> {
+            long marketCap1 =
+                asset1.getExchange().startsWith("KOS") ? asset1.getMarketCap() : asset1.getMarketCap() / krwUsd;
+            long marketCap2 =
+                asset2.getExchange().startsWith("KOS") ? asset2.getMarketCap() : asset2.getMarketCap() / krwUsd;
+
+            return Long.compare(marketCap2, marketCap1);
+        }).collect(Collectors.toList());
+    }
+
 }
