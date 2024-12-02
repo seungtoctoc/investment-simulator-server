@@ -44,9 +44,9 @@ public class Service {
 
         return assets.stream().sorted((asset1, asset2) -> {
             long marketCap1 =
-                asset1.getExchange().startsWith("KOS") ? asset1.getMarketCap() : asset1.getMarketCap() / krwUsd;
+                asset1.getExchange().startsWith("KOS") ? asset1.getMarketCap() / krwUsd : asset1.getMarketCap();
             long marketCap2 =
-                asset2.getExchange().startsWith("KOS") ? asset2.getMarketCap() : asset2.getMarketCap() / krwUsd;
+                asset2.getExchange().startsWith("KOS") ? asset2.getMarketCap() / krwUsd : asset2.getMarketCap();
 
             return Long.compare(marketCap2, marketCap1);
         }).collect(Collectors.toList());
