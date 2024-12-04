@@ -3,6 +3,7 @@ package stt.investmentsimulatorserver.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,6 +15,7 @@ import stt.investmentsimulatorserver.utils.ApiUtils;
 
 @org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = "${CLIENT_URL}")
 @AllArgsConstructor
 public class RestController {
     private Service service;
