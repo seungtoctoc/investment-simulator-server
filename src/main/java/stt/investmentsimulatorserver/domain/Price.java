@@ -1,5 +1,7 @@
 package stt.investmentsimulatorserver.domain;
 
+import java.time.LocalDate;
+
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
@@ -10,13 +12,13 @@ import lombok.Getter;
 @Entity
 @Getter
 @JsonNaming(PropertyNamingStrategy.SnakeCaseStrategy.class)
-public class Assets {
+public class Price {
     @Id
-    private Integer id;
+    Integer id;
+
     private String symbol;
-    private String type;
-    private String exchange;
-    private String name;
-    private String koreanName;
-    private Long marketCap;
+
+    private LocalDate date;
+
+    private Double close;
 }
