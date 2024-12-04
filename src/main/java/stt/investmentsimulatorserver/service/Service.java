@@ -78,6 +78,46 @@ public class Service {
         return result;
     }
 
+    Double getDepositExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
+        if (isSameCurrency(exchange, isDollar)) {
+            return 1.0;
+        }
+
+        List<Price> depositExchangeRates = isDollar ? priceCache.getKrwUsdPrices() : priceCache.getUsdKrwPrices();
+
+        Price depositExchangeRate = depositExchangeRates.stream()
+            .filter(price -> price.getDate().getYear() == date.getYear()
+                && price.getDate().getMonthValue() == date.getMonthValue())
+            .min(Comparator.comparing(Price::getDate))
+            .orElse(null);
+
+        if (depositExchangeRate == null) {
+            throw new IllegalStateException("cannot find price for deposit exchange rate");
+        }
+
+        return depositExchangeRate.getClose();
+    }
+
+    Double getEvaluationExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
+        if (isSameCurrency(exchange, isDollar)) {
+            return 1.0;
+        }
+
+        List<Price> depositExchangeRates = isDollar ? priceCache.getUsdKrwPrices() : priceCache.getKrwUsdPrices();
+
+        Price depositExchangeRate = depositExchangeRates.stream()
+            .filter(price -> price.getDate().getYear() == date.getYear()
+                && price.getDate().getMonthValue() == date.getMonthValue())
+            .min(Comparator.comparing(Price::getDate))
+            .orElse(null);
+
+        if (depositExchangeRate == null) {
+            throw new IllegalStateException("cannot find price for evaluation exchange rate");
+        }
+
+        return depositExchangeRate.getClose();
+    }
+
     Boolean isSameCurrency(String exchange, Boolean isDollar) {
         if (exchange.equals("FOREX")) {
             return false;
@@ -95,26 +135,6 @@ public class Service {
         String assetCurrency = currency.get(exchange);
 
         return originalCurrency.equals(assetCurrency);
-    }
-
-    Double getDepositExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
-        if (isSameCurrency(exchange, isDollar)) {
-            return 1.0;
-        }
-
-        List<Price> depositExchangeRates = isDollar ? priceCache.getKrwUsdPrices() : priceCache.getUsdKrwPrices();
-
-        Price depositExchangeRate = depositExchangeRates.stream()
-            .filter(price -> price.getDate().getYear() == date.getYear()
-                && price.getDate().getMonthValue() == date.getMonthValue())
-            .min(Comparator.comparing(Price::getDate))
-            .orElse(null);
-
-        if (depositExchangeRate == null) {
-            throw new IllegalStateException("cannot find dollar price");
-        }
-
-        return depositExchangeRate.getClose();
     }
 
     List<Asset> sortAssetsByMarketCap(List<Asset> assets) {
