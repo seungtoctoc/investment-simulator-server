@@ -112,16 +112,23 @@ public class Service {
                 simulateAssetRequest.getIsDollar(), event.getDate());
 
             if (event.getType().equals("price")) {
-                cash += Utils.floorMoney(simulateAssetRequest.getMonthly() * depositExchangeRate,
-                    simulateAssetRequest.getIsDollar());
+                double monthlyInput = simulateAssetRequest.getMonthly() * depositExchangeRate;
+                cash += Utils.floorMoney(monthlyInput, simulateAssetRequest.getIsDollar());
+
                 double amountIncrease = cash / event.getPrice().getClose();
-                cash %= event.getPrice().getClose();
                 totalAmount += (long)amountIncrease;
+
+                cash %= event.getPrice().getClose();
+                cash = Utils.floorMoney(cash, simulateAssetRequest.getIsDollar());
+
                 latestValuation = (event.getPrice().getClose() * totalAmount + cash) * valuationExchangeRate;
-                
+                latestValuation = Utils.floorMoney(latestValuation, simulateAssetRequest.getIsDollar());
+
+                double valuationPer = event.getPrice().getClose() * valuationExchangeRate;
+                valuationPer = Utils.floorMoney(valuationPer, simulateAssetRequest.getIsDollar());
+
                 purchaseHistories.add(
-                    new PurchaseHistory(event.getDate(), event.getPrice().getClose() * valuationExchangeRate,
-                        (long)amountIncrease, totalAmount));
+                    new PurchaseHistory(event.getDate(), valuationPer, (long)amountIncrease, totalAmount));
                 valuationHistories.add(
                     new ValuationHistory(event.getDate(), latestValuation)
                 );
@@ -132,7 +139,15 @@ public class Service {
             if (event.getType().equals("dividend")) {
                 double dividend = totalAmount * event.getDividend().getDividend();
                 totalDividend += dividend;
+                totalDividend = Utils.floorMoney(totalDividend, simulateAssetRequest.getIsDollar());
+
+                if (simulateAssetRequest.getIsReinvest()) {
+                    cash += dividend;
+                    cash = Utils.floorMoney(cash, simulateAssetRequest.getIsDollar());
+                }
+
                 latestValuation += cash * valuationExchangeRate;
+                latestValuation = Utils.floorMoney(latestValuation, simulateAssetRequest.getIsDollar());
 
                 dividendHistories.add(
                     new DividendHistory(event.getDate(), totalAmount, dividend * valuationExchangeRate,
@@ -142,16 +157,14 @@ public class Service {
             }
         }
 
-        double finalValuationExchangeRate = getValuationExchangeRate(
-            simulateAssetRequest.getExchange(), simulateAssetRequest.getIsDollar(), prices.get(0).getDate());
-        double totalValuation = (prices.get(0).getClose() * totalAmount + cash) * finalValuationExchangeRate;
-        double totalProfit = totalValuation - simulateAssetRequest.getMonthly()
-            - simulateAssetRequest.getMonthly() * simulateAssetRequest.getMonthly() * 12;
+        double totalInput =
+            simulateAssetRequest.getSeed() + simulateAssetRequest.getMonthly() * simulateAssetRequest.getPeriod() * 12;
+        double totalProfit = latestValuation - totalInput;
 
         return new SimulateAssetResponse(
-            totalValuation,
+            latestValuation,
             totalProfit,
-            totalProfit / totalValuation,
+            totalProfit / totalInput,
             totalAmount,
             totalDividend,
             cash,
