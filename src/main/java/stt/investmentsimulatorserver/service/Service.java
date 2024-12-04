@@ -1,7 +1,9 @@
 package stt.investmentsimulatorserver.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,8 @@ public class Service {
     private DividendJpaRepository dividendJpaRepository;
     private PriceJpaRepository priceJpaRepository;
     private SplitJpaRepository splitJpaRepository;
+
+    PriceCache priceCache;
 
     public List<Asset> findAssets(String keyword, int limit) {
         if (Utils.containsKorean(keyword)) {
@@ -63,20 +67,54 @@ public class Service {
         prices.sort(Comparator.comparing(Price::getDate).reversed());
         prices = Utils.limitList(prices, simulateAssetRequest.getPeriod() * 12);
 
-        result.put("sortedPrices", prices);
+        LocalDate date = LocalDate.parse("2024-01-02");
+        Double depositExchangeRate = getDepositExchangeRate(simulateAssetRequest.getExchange(),
+            simulateAssetRequest.getIsDollar(), date);
+
+        // result.put("sortedPrices", prices);
         result.put("prices size: ", prices.size());
+        result.put("depositExchangeRate", depositExchangeRate);
 
         return result;
     }
 
-    @Cacheable(value = "priceCache", key = "'KrwUsd'")
-    public List<Price> getKrwUsdPrices() {
-        return priceJpaRepository.findAllBySymbol("KRWUSD");
+    Boolean isSameCurrency(String exchange, Boolean isDollar) {
+        if (exchange.equals("FOREX")) {
+            return false;
+        }
+
+        Map<String, String> currency = Map.of(
+            "KOSDAQ", "KRW",
+            "KOSPI", "KRW",
+            "NASDAQ", "USD",
+            "NYSE", "USD",
+            "AMEX", "USD"
+        );
+
+        String originalCurrency = isDollar ? "USD" : "KRW";
+        String assetCurrency = currency.get(exchange);
+
+        return originalCurrency.equals(assetCurrency);
     }
 
-    @Cacheable(value = "priceCache", key = "'UsdKrw'")
-    public List<Price> getUsdKrwPrices() {
-        return priceJpaRepository.findAllBySymbol("USDKRW");
+    Double getDepositExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
+        if (isSameCurrency(exchange, isDollar)) {
+            return 1.0;
+        }
+
+        List<Price> depositExchangeRates = isDollar ? priceCache.getKrwUsdPrices() : priceCache.getUsdKrwPrices();
+
+        Price depositExchangeRate = depositExchangeRates.stream()
+            .filter(price -> price.getDate().getYear() == date.getYear()
+                && price.getDate().getMonthValue() == date.getMonthValue())
+            .min(Comparator.comparing(Price::getDate))
+            .orElse(null);
+
+        if (depositExchangeRate == null) {
+            throw new IllegalStateException("cannot find dollar price");
+        }
+
+        return depositExchangeRate.getClose();
     }
 
     List<Asset> sortAssetsByMarketCap(List<Asset> assets) {

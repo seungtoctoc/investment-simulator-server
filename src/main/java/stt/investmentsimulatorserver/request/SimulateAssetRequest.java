@@ -1,5 +1,7 @@
 package stt.investmentsimulatorserver.request;
 
+import java.math.BigInteger;
+
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
@@ -9,13 +11,16 @@ public class SimulateAssetRequest {
     String symbol;
 
     @NotNull
+    String exchange;
+
+    @NotNull
     Integer period;
 
     @NotNull
-    Long seed;
+    BigInteger seed;
 
     @NotNull
-    Long monthly;
+    BigInteger monthly;
 
     @NotNull
     Boolean isReinvest;
