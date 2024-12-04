@@ -17,10 +17,10 @@ public class SimulateAssetRequest {
     Integer period;
 
     @NotNull
-    BigInteger seed;
+    Long seed;
 
     @NotNull
-    BigInteger monthly;
+    Long monthly;
 
     @NotNull
     Boolean isReinvest;

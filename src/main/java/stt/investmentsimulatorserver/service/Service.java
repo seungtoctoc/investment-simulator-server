@@ -3,13 +3,12 @@ package stt.investmentsimulatorserver.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.stream.Collectors;
-
-import org.springframework.cache.annotation.Cacheable;
 
 import lombok.AllArgsConstructor;
 import stt.investmentsimulatorserver.domain.Asset;
@@ -21,6 +20,7 @@ import stt.investmentsimulatorserver.repository.DividendJpaRepository;
 import stt.investmentsimulatorserver.repository.PriceJpaRepository;
 import stt.investmentsimulatorserver.repository.SplitJpaRepository;
 import stt.investmentsimulatorserver.request.SimulateAssetRequest;
+import stt.investmentsimulatorserver.response.SimulateAssetResponse;
 import stt.investmentsimulatorserver.utils.Utils;
 
 @org.springframework.stereotype.Service
@@ -57,9 +57,7 @@ public class Service {
         return result;
     }
 
-    public Map<String, Object> simulateAsset(SimulateAssetRequest simulateAssetRequest) {
-        Map<String, Object> result = new HashMap<>();
-
+    public SimulateAssetResponse simulateAsset(SimulateAssetRequest simulateAssetRequest) {
         List<Price> prices = priceJpaRepository.findAllBySymbol(simulateAssetRequest.getSymbol());
         List<Dividend> dividends = dividendJpaRepository.findAllBySymbol(simulateAssetRequest.getSymbol());
         List<Split> splits = splitJpaRepository.findAllBySymbol(simulateAssetRequest.getSymbol());
@@ -67,15 +65,101 @@ public class Service {
         prices.sort(Comparator.comparing(Price::getDate).reversed());
         prices = Utils.limitList(prices, simulateAssetRequest.getPeriod() * 12);
 
-        LocalDate date = LocalDate.parse("2024-01-02");
-        Double depositExchangeRate = getDepositExchangeRate(simulateAssetRequest.getExchange(),
-            simulateAssetRequest.getIsDollar(), date);
+        LocalDate startDate = prices.get(prices.size() - 1).getDate();
+        PriorityQueue<Event> eventQueue = new PriorityQueue<>(Comparator.comparing(Event::getDate));
+        for (Price price : prices) {
+            eventQueue.add(new Event(price.getDate(), "price", price, null, null));
+        }
+        for (Dividend dividend : dividends) {
+            if (dividend.getDate().isAfter(startDate)) {
+                eventQueue.add(new Event(dividend.getDate(), "dividend", null, dividend, null));
+            }
+        }
+        for (Split split : splits) {
+            if (split.getDate().isAfter(startDate)) {
+                eventQueue.add(new Event(split.getDate(), "split", null, null, split));
+            }
+        }
 
-        // result.put("sortedPrices", prices);
-        result.put("prices size: ", prices.size());
-        result.put("depositExchangeRate", depositExchangeRate);
+        double depositExchangeRateOfStartDate = getDepositExchangeRate(
+            simulateAssetRequest.getExchange(), simulateAssetRequest.getIsDollar(), startDate);
+        double cash =
+            (simulateAssetRequest.getSeed() - simulateAssetRequest.getMonthly()) * depositExchangeRateOfStartDate;
+        cash = Utils.floorMoney(cash, simulateAssetRequest.getIsDollar());
+        double totalAmount = 0;
+        double totalDividend = 0;
+        double latestValuation = 0;
+        List<ValuationHistory> valuationHistories = new ArrayList<>();
+        List<PurchaseHistory> purchaseHistories = new ArrayList<>();
+        List<DividendHistory> dividendHistories = new ArrayList<>();
+        List<SplitHistory> splitHistories = new ArrayList<>();
+        while (!eventQueue.isEmpty()) {
+            Event event = eventQueue.poll();
 
-        return result;
+            if (event.getType().equals("split")) {
+                double beforeAmount = totalAmount;
+                totalAmount =
+                    (double)Math.round(
+                        totalAmount / event.getSplit().getDenominator() * event.getSplit().getNumerator() * 10) / 10;
+
+                splitHistories.add(new SplitHistory(event.getDate(), beforeAmount, totalAmount));
+                continue;
+            }
+
+            double depositExchangeRate = getDepositExchangeRate(simulateAssetRequest.getExchange(),
+                simulateAssetRequest.getIsDollar(), event.getDate());
+            double valuationExchangeRate = getValuationExchangeRate(simulateAssetRequest.getExchange(),
+                simulateAssetRequest.getIsDollar(), event.getDate());
+
+            if (event.getType().equals("price")) {
+                cash += Utils.floorMoney(simulateAssetRequest.getMonthly() * depositExchangeRate,
+                    simulateAssetRequest.getIsDollar());
+                double amountIncrease = cash / event.getPrice().getClose();
+                cash %= event.getPrice().getClose();
+                totalAmount += (long)amountIncrease;
+                latestValuation = (event.getPrice().getClose() * totalAmount + cash) * valuationExchangeRate;
+                
+                purchaseHistories.add(
+                    new PurchaseHistory(event.getDate(), event.getPrice().getClose() * valuationExchangeRate,
+                        (long)amountIncrease, totalAmount));
+                valuationHistories.add(
+                    new ValuationHistory(event.getDate(), latestValuation)
+                );
+
+                continue;
+            }
+
+            if (event.getType().equals("dividend")) {
+                double dividend = totalAmount * event.getDividend().getDividend();
+                totalDividend += dividend;
+                latestValuation += cash * valuationExchangeRate;
+
+                dividendHistories.add(
+                    new DividendHistory(event.getDate(), totalAmount, dividend * valuationExchangeRate,
+                        totalDividend * valuationExchangeRate));
+                valuationHistories.add(
+                    new ValuationHistory(event.getDate(), latestValuation));
+            }
+        }
+
+        double finalValuationExchangeRate = getValuationExchangeRate(
+            simulateAssetRequest.getExchange(), simulateAssetRequest.getIsDollar(), prices.get(0).getDate());
+        double totalValuation = (prices.get(0).getClose() * totalAmount + cash) * finalValuationExchangeRate;
+        double totalProfit = totalValuation - simulateAssetRequest.getMonthly()
+            - simulateAssetRequest.getMonthly() * simulateAssetRequest.getMonthly() * 12;
+
+        return new SimulateAssetResponse(
+            totalValuation,
+            totalProfit,
+            totalProfit / totalValuation,
+            totalAmount,
+            totalDividend,
+            cash,
+            valuationHistories,
+            purchaseHistories,
+            dividendHistories,
+            splitHistories
+        );
     }
 
     Double getDepositExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
@@ -83,7 +167,7 @@ public class Service {
             return 1.0;
         }
 
-        List<Price> depositExchangeRates = isDollar ? priceCache.getKrwUsdPrices() : priceCache.getUsdKrwPrices();
+        List<Price> depositExchangeRates = isDollar ? priceCache.getUsdKrwPrices() : priceCache.getKrwUsdPrices();
 
         Price depositExchangeRate = depositExchangeRates.stream()
             .filter(price -> price.getDate().getYear() == date.getYear()
@@ -98,24 +182,24 @@ public class Service {
         return depositExchangeRate.getClose();
     }
 
-    Double getEvaluationExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
+    Double getValuationExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
         if (isSameCurrency(exchange, isDollar)) {
             return 1.0;
         }
 
-        List<Price> depositExchangeRates = isDollar ? priceCache.getUsdKrwPrices() : priceCache.getKrwUsdPrices();
+        List<Price> valuationExchangeRates = isDollar ? priceCache.getKrwUsdPrices() : priceCache.getUsdKrwPrices();
 
-        Price depositExchangeRate = depositExchangeRates.stream()
+        Price valuationExchangeRate = valuationExchangeRates.stream()
             .filter(price -> price.getDate().getYear() == date.getYear()
                 && price.getDate().getMonthValue() == date.getMonthValue())
             .min(Comparator.comparing(Price::getDate))
             .orElse(null);
 
-        if (depositExchangeRate == null) {
-            throw new IllegalStateException("cannot find price for evaluation exchange rate");
+        if (valuationExchangeRate == null) {
+            throw new IllegalStateException("cannot find price for valuation exchange rate");
         }
 
-        return depositExchangeRate.getClose();
+        return valuationExchangeRate.getClose();
     }
 
     Boolean isSameCurrency(String exchange, Boolean isDollar) {

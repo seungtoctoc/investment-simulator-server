@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import stt.investmentsimulatorserver.domain.Asset;
 import stt.investmentsimulatorserver.request.SimulateAssetRequest;
+import stt.investmentsimulatorserver.response.SimulateAssetResponse;
 import stt.investmentsimulatorserver.service.Service;
 import stt.investmentsimulatorserver.utils.ApiUtils;
 
@@ -40,12 +41,12 @@ public class RestController {
 
     @PostMapping("/simulate")
     public ApiUtils.ApiResult<Object> simulateAsset(@RequestBody @Valid SimulateAssetRequest simulateAssetRequest) {
-        Map<String, Object> result = service.simulateAsset(simulateAssetRequest);
+        SimulateAssetResponse simulateAssetResponse = service.simulateAsset(simulateAssetRequest);
 
-        if (result == null) {
+        if (simulateAssetResponse == null) {
             return ApiUtils.error(HttpStatus.INTERNAL_SERVER_ERROR);
         }
         
-        return ApiUtils.success(result);
+        return ApiUtils.success(simulateAssetResponse);
     }
 }

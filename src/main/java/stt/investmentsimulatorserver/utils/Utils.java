@@ -15,7 +15,18 @@ public class Utils {
         if (list.size() < limit) {
             return list;
         }
-        
+
         return list.subList(0, limit);
+    }
+
+    public static double floorMoney(double money, boolean isDollar) {
+        if (isDollar) {
+            return Math.floor(money * 100) / 100.0;
+        }
+        return Math.floor(money);
+    }
+
+    public static double roundAmount(double amount) {
+        return Math.round(amount * 10) / 10.0;
     }
 }
