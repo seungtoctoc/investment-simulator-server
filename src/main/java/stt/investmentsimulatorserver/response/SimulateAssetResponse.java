@@ -31,4 +31,6 @@ public class SimulateAssetResponse {
     private List<DividendHistory> dividendHistory;
 
     private List<SplitHistory> splitHistory;
+
+    private Boolean isDollar;
 }

@@ -83,16 +83,18 @@ public class Service {
 
         double depositExchangeRateOfStartDate = getDepositExchangeRate(
             simulateAssetRequest.getExchange(), simulateAssetRequest.getIsDollar(), startDate);
-        double cash =
-            (simulateAssetRequest.getSeed() - simulateAssetRequest.getMonthly()) * depositExchangeRateOfStartDate;
-        cash = Utils.floorMoney(cash, simulateAssetRequest.getIsDollar());
         double totalAmount = 0;
         double totalDividend = 0;
         double latestValuation = 0;
+        double totalInput = simulateAssetRequest.getSeed() - simulateAssetRequest.getMonthly();
+        double cash = totalInput * depositExchangeRateOfStartDate;
+        cash = Utils.floorMoney(cash, simulateAssetRequest.getIsDollar());
+
         List<ValuationHistory> valuationHistories = new ArrayList<>();
         List<PurchaseHistory> purchaseHistories = new ArrayList<>();
         List<DividendHistory> dividendHistories = new ArrayList<>();
         List<SplitHistory> splitHistories = new ArrayList<>();
+
         while (!eventQueue.isEmpty()) {
             Event event = eventQueue.poll();
 
@@ -112,8 +114,10 @@ public class Service {
                 simulateAssetRequest.getIsDollar(), event.getDate());
 
             if (event.getType().equals("price")) {
-                double monthlyInput = simulateAssetRequest.getMonthly() * depositExchangeRate;
-                cash += Utils.floorMoney(monthlyInput, simulateAssetRequest.getIsDollar());
+                totalInput += simulateAssetRequest.getMonthly();
+
+                cash += simulateAssetRequest.getMonthly() * depositExchangeRate;
+                cash = Utils.floorMoney(cash, simulateAssetRequest.getIsDollar());
 
                 double amountIncrease = cash / event.getPrice().getClose();
                 totalAmount += (long)amountIncrease;
@@ -157,8 +161,6 @@ public class Service {
             }
         }
 
-        double totalInput =
-            simulateAssetRequest.getSeed() + simulateAssetRequest.getMonthly() * simulateAssetRequest.getPeriod() * 12;
         double totalProfit = latestValuation - totalInput;
         totalProfit = Utils.floorMoney(totalProfit, simulateAssetRequest.getIsDollar());
         double profitRate = Math.round(totalProfit / totalInput * 100 * 100) / 100.0;
@@ -173,7 +175,8 @@ public class Service {
             valuationHistories,
             purchaseHistories,
             dividendHistories,
-            splitHistories
+            splitHistories,
+            simulateAssetRequest.getIsDollar()
         );
     }
 
