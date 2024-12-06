@@ -165,6 +165,9 @@ public class Service {
         totalProfit = Utils.floorMoney(totalProfit, simulateAssetRequest.getIsDollar());
         double profitRate = Math.round(totalProfit / totalInput * 100 * 100) / 100.0;
 
+        String valuationCurrency = simulateAssetRequest.getIsDollar() ? "달러(USD)" : "원(KRW)";
+        String exchangeCurrency = getExchangeCurrency(simulateAssetRequest.getExchange());
+
         return new SimulateAssetResponse(
             latestValuation,
             totalProfit,
@@ -176,7 +179,9 @@ public class Service {
             purchaseHistories,
             dividendHistories,
             splitHistories,
-            simulateAssetRequest.getIsDollar()
+            simulateAssetRequest.getSymbol(),
+            valuationCurrency,
+            exchangeCurrency
         );
     }
 
@@ -220,21 +225,24 @@ public class Service {
         return valuationExchangeRate.getClose();
     }
 
+    String getExchangeCurrency(String exchange) {
+        Map<String, String> currency = Map.of(
+            "KOSDAQ", "원(KRW)",
+            "KOSPI", "원(KRW)",
+            "NASDAQ", "달러(USD)",
+            "NYSE", "달러(USD)",
+            "AMEX", "달러(USD)"
+        );
+        return currency.get(exchange);
+    }
+
     Boolean isSameCurrency(String exchange, Boolean isDollar) {
         if (exchange.equals("FOREX")) {
             return false;
         }
 
-        Map<String, String> currency = Map.of(
-            "KOSDAQ", "KRW",
-            "KOSPI", "KRW",
-            "NASDAQ", "USD",
-            "NYSE", "USD",
-            "AMEX", "USD"
-        );
-
-        String originalCurrency = isDollar ? "USD" : "KRW";
-        String assetCurrency = currency.get(exchange);
+        String originalCurrency = isDollar ? "달러(USD)" : "원(KRW)";
+        String assetCurrency = getExchangeCurrency(exchange);
 
         return originalCurrency.equals(assetCurrency);
     }

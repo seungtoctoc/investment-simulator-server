@@ -32,5 +32,9 @@ public class SimulateAssetResponse {
 
     private List<SplitHistory> splitHistory;
 
-    private Boolean isDollar;
+    private String symbol;
+
+    private String valuationCurrency;
+
+    private String exchangeCurrency;
 }
