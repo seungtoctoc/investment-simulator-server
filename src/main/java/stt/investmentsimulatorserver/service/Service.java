@@ -150,8 +150,8 @@ public class Service {
                 latestValuation = Utils.floorMoney(latestValuation, simulateAssetRequest.getIsDollar());
 
                 dividendHistories.add(
-                    new DividendHistory(event.getDate(), totalAmount, dividend * valuationExchangeRate,
-                        totalDividend * valuationExchangeRate));
+                    new DividendHistory(event.getDate(), totalAmount, dividend,
+                        totalDividend));
                 valuationHistories.add(
                     new ValuationHistory(event.getDate(), latestValuation));
             }
@@ -160,11 +160,13 @@ public class Service {
         double totalInput =
             simulateAssetRequest.getSeed() + simulateAssetRequest.getMonthly() * simulateAssetRequest.getPeriod() * 12;
         double totalProfit = latestValuation - totalInput;
+        totalProfit = Utils.floorMoney(totalProfit, simulateAssetRequest.getIsDollar());
+        double profitRate = Math.round(totalProfit / totalInput * 100 * 100) / 100.0;
 
         return new SimulateAssetResponse(
             latestValuation,
             totalProfit,
-            totalProfit / totalInput,
+            profitRate,
             totalAmount,
             totalDividend,
             cash,
