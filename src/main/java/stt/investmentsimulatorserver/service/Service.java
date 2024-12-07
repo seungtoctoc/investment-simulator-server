@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
@@ -142,6 +143,7 @@ public class Service {
 
             if (event.getType().equals("dividend")) {
                 double dividend = totalAmount * event.getDividend().getDividend();
+                dividend = Utils.floorMoney(dividend, simulateAssetRequest.getIsDollar());
                 totalDividend += dividend;
                 totalDividend = Utils.floorMoney(totalDividend, simulateAssetRequest.getIsDollar());
 
@@ -165,7 +167,7 @@ public class Service {
         totalProfit = Utils.floorMoney(totalProfit, simulateAssetRequest.getIsDollar());
         double profitRate = Math.round(totalProfit / totalInput * 100 * 100) / 100.0;
 
-        String valuationCurrency = simulateAssetRequest.getIsDollar() ? "달러(USD)" : "원(KRW)";
+        String valuationCurrency = simulateAssetRequest.getIsDollar() ? "USD(달러)" : "원(KRW)";
         String exchangeCurrency = getExchangeCurrency(simulateAssetRequest.getExchange());
 
         return new SimulateAssetResponse(
@@ -192,17 +194,32 @@ public class Service {
 
         List<Price> depositExchangeRates = isDollar ? priceCache.getUsdKrwPrices() : priceCache.getKrwUsdPrices();
 
-        Price depositExchangeRate = depositExchangeRates.stream()
-            .filter(price -> price.getDate().getYear() == date.getYear()
-                && price.getDate().getMonthValue() == date.getMonthValue())
-            .min(Comparator.comparing(Price::getDate))
-            .orElse(null);
+        List<Price> yearFilteredRates = depositExchangeRates.stream()
+            .filter(price -> price.getDate().getYear() == date.getYear())
+            .sorted(Comparator.comparing(Price::getDate))
+            .toList();
 
-        if (depositExchangeRate == null) {
-            throw new IllegalStateException("cannot find price for deposit exchange rate");
+        if (yearFilteredRates.isEmpty()) {
+            List<Price> sortedExchangeRates = depositExchangeRates.stream()
+                .sorted(Comparator.comparing(Price::getDate))
+                .toList();
+
+            for (Price price : sortedExchangeRates) {
+                if (date.isBefore(price.getDate())) {
+                    return price.getClose();
+                }
+            }
         }
 
-        return depositExchangeRate.getClose();
+        Optional<Price> depositExchangeRate = yearFilteredRates.stream()
+            .filter(price -> price.getDate().getMonthValue() == date.getMonthValue())
+            .findFirst();
+
+        if (depositExchangeRate.isPresent()) {
+            return depositExchangeRate.get().getClose();
+        }
+
+        return yearFilteredRates.get(0).getClose();
     }
 
     Double getValuationExchangeRate(String exchange, Boolean isDollar, LocalDate date) {
@@ -212,26 +229,41 @@ public class Service {
 
         List<Price> valuationExchangeRates = isDollar ? priceCache.getKrwUsdPrices() : priceCache.getUsdKrwPrices();
 
-        Price valuationExchangeRate = valuationExchangeRates.stream()
-            .filter(price -> price.getDate().getYear() == date.getYear()
-                && price.getDate().getMonthValue() == date.getMonthValue())
-            .min(Comparator.comparing(Price::getDate))
-            .orElse(null);
+        List<Price> yearFilteredRates = valuationExchangeRates.stream()
+            .filter(price -> price.getDate().getYear() == date.getYear())
+            .sorted(Comparator.comparing(Price::getDate))
+            .toList();
 
-        if (valuationExchangeRate == null) {
-            throw new IllegalStateException("cannot find price for valuation exchange rate");
+        if (yearFilteredRates.isEmpty()) {
+            List<Price> sortedExchangeRates = valuationExchangeRates.stream()
+                .sorted(Comparator.comparing(Price::getDate))
+                .toList();
+
+            for (Price price : sortedExchangeRates) {
+                if (date.isBefore(price.getDate())) {
+                    return price.getClose();
+                }
+            }
         }
 
-        return valuationExchangeRate.getClose();
+        Optional<Price> valuationExchangeRate = yearFilteredRates.stream()
+            .filter(price -> price.getDate().getMonthValue() == date.getMonthValue())
+            .findFirst();
+
+        if (valuationExchangeRate.isPresent()) {
+            return valuationExchangeRate.get().getClose();
+        }
+
+        return yearFilteredRates.get(0).getClose();
     }
 
     String getExchangeCurrency(String exchange) {
         Map<String, String> currency = Map.of(
             "KOSDAQ", "원(KRW)",
             "KOSPI", "원(KRW)",
-            "NASDAQ", "달러(USD)",
-            "NYSE", "달러(USD)",
-            "AMEX", "달러(USD)"
+            "NASDAQ", "USD(달러)",
+            "NYSE", "USD(달러)",
+            "AMEX", "USD(달러)"
         );
         return currency.get(exchange);
     }
@@ -241,7 +273,7 @@ public class Service {
             return false;
         }
 
-        String originalCurrency = isDollar ? "달러(USD)" : "원(KRW)";
+        String originalCurrency = isDollar ? "USD(달러)" : "원(KRW)";
         String assetCurrency = getExchangeCurrency(exchange);
 
         return originalCurrency.equals(assetCurrency);
