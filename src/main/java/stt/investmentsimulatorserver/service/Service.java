@@ -100,12 +100,12 @@ public class Service {
             Event event = eventQueue.poll();
 
             if (event.getType().equals("split")) {
-                double beforeAmount = totalAmount;
-                totalAmount =
-                    (double)Math.round(
-                        totalAmount / event.getSplit().getDenominator() * event.getSplit().getNumerator() * 10) / 10;
-
-                splitHistories.add(new SplitHistory(event.getDate(), beforeAmount, totalAmount));
+                // double beforeAmount = totalAmount;
+                // totalAmount =
+                //     (double)Math.round(
+                //         totalAmount / event.getSplit().getDenominator() * event.getSplit().getNumerator() * 10) / 10;
+                //
+                // splitHistories.add(new SplitHistory(event.getDate(), beforeAmount, totalAmount));
                 continue;
             }
 
